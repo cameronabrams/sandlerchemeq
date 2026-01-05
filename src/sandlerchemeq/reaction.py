@@ -70,7 +70,7 @@ class Reaction:
         ''' spoof nu if reaction is not yet balanced '''
         nuR=['*']*self.nReactants if len(self.nu)==0 else self.nu[:self.nReactants]
         nuP=['*']*self.nProducts  if len(self.nu)==0 else self.nu[self.nReactants:]
-        reactant_string = '  +  '.join([f'{n:.0f} {str(s)}' for n,s in zip(-nuR,self.nReactants)])
+        reactant_string = '  +  '.join([f'{n:.0f} {str(s)}' for n,s in zip(-nuR,self.R)])
         product_string = '  +  '.join([f'{n:.0f} {str(s)}' for n,s in zip(nuP,self.P)])
         return reactant_string+'   <->   '+product_string
     
@@ -84,37 +84,7 @@ class Reaction:
                 infolist.append(f'Δ{p} = {v:.2f}')
         return retstr+' '.join(infolist)
 
-    def as_tex(self):
-        reactants,products,nureactants,nuproducts=self._split_reactants_products()
-        rxnstr=r'\ce{'+' + '.join(['{:s} {:s}'.format(n,e) for n,e in zip(nureactants,reactants)])+r' <=> '+' + '.join(['{:s} {:s}'.format(n,e) for n,e in zip(nuproducts,products)])+r'}'
-        return rxnstr
-
-    def _split_reactants_products(self):
-        reactants=[]
-        products=[]
-        nureactants=[]
-        nuproducts=[]
-        emps=[c.Formula for c in self.components]
-        for e,n in zip(emps,self.nu):
-            if n<0:
-                reactants.append(e)
-                f=fr.Fraction(-n).limit_denominator(1000)
-                nureactants.append(self._frac_or_int_as_str(f))
-            elif n>0:
-                products.append(e)
-                f=fr.Fraction(n).limit_denominator(1000)
-                nuproducts.append(self._frac_or_int_as_str(f))
-        return (reactants,products,nureactants,nuproducts)
-    
-    def _frac_or_int_as_str(self, f: fr.Fraction) -> str:
-        if f.denominator>1:
-            return r'\frac{'+'{:d}'.format(f.numerator)+r'}{'+'{:d}'.format(f.denominator)+r'}'
-        else:
-            if f.numerator==1:
-                return ''
-            else:
-                return '{:d}'.format(f.numerator)
-
+ 
 
 
 

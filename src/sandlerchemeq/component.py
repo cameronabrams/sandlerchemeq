@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 import numpy as np
 
-from sandlermisc.texutils import format_sig, Cp_as_tex
 from sandlerprops.compound import Compound
 from sandlerprops.properties import PropertiesDatabase, get_database
 
@@ -105,18 +104,6 @@ class Component(Compound):
 
     def __str__(self):
         return self.Formula.split('^')[0] + ('' if self.charge==0 else r'^{'+f'{self.charge:+}'+r'}')
-
-    def as_tex(self):
-        """
-        Returns a LaTeX-formatted string of the compound's empirical formula
-        using the mhchem package's \\ce{} command.
-        
-        Returns
-        -------
-        retstr : str
-            LaTeX-formatted empirical formula string
-        """
-        return r'\ce{'+str(self)+r'}'
 
     def countAtoms(self, a: str) -> int:
         """

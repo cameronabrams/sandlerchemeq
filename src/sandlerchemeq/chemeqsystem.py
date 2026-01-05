@@ -11,7 +11,6 @@ import numpy as np
 from dataclasses import dataclass, field
 from scipy.optimize import fsolve
 
-from sandlermisc.texutils import table_as_tex, format_sig
 from sandlermisc.gas_constant import GasConstant
 from sandlerprops.properties import get_database
 
@@ -33,11 +32,11 @@ class ChemEqSystem:
     T: float = 298.15
     """ System temperature in K """
 
-    Components: list[Component] = field(default_factory=list)
+    components: list[Component] = field(default_factory=list)
     """ List of all components in the system """
     N0: np.ndarray = field(default_factory=lambda: np.array([]))
     """ Initial moles of each component """
-    Reactions: list[Reaction] = field(default_factory=list)
+    reactions: list[Reaction] = field(default_factory=list)
     """ List of explicit reactions in the system """
 
     N: np.ndarray = field(default_factory=lambda: np.array([]))
@@ -46,11 +45,11 @@ class ChemEqSystem:
     """ Mole fractions of each component at equilibrium """
 
     def __post_init__(self):
-        self.C = len(self.Components)
+        self.C = len(self.components)
         self.R = GasConstant() # J/mol.K
         self.RT = self.R * self.T
-        self.M = len(self.Reactions)
-        for c in self.Components:
+        self.M = len(self.reactions)
+        for c in self.components:
             c.T = self.T
             c.P = self.P
             c.Tref = self.T0
@@ -62,13 +61,13 @@ class ChemEqSystem:
             self.dHr = np.array([])
             self.dCp = np.array([])
             self.nu = np.zeros((self.M, self.C))
-            for i, r in enumerate(self.Reactions):
+            for i, r in enumerate(self.reactions):
                 self.dGr = np.append(self.dGr, r.stoProps['dGf'])
                 self.dHr = np.append(self.dHr, r.stoProps['dHf'])
                 self.dCp = np.append(self.dCp, r.stoProps['Cp'])
-                for c in self.Components:
+                for c in self.components:
                     if c in r.components:
-                        ci = self.Components.index(c)
+                        ci = self.components.index(c)
                         nu = r.nu[r.components.index(c)]
                         self.nu[i][ci] = nu
             self.Ka0 = np.exp(-self.dGr/(self.R*self.T0))
@@ -77,18 +76,25 @@ class ChemEqSystem:
             arg2 = self.dCp[1]/(2*self.R) * (self.T - self.T0)
             arg3 = self.dCp[2]/(6*self.R) * (self.T**2 - self.T0**2)
             arg4 = self.dCp[3]/(12*self.R) * (self.T**3 - self.T0**3)
+            bigterm1 = arg1 + arg2 + arg3 + arg4
             rtdiff = 1/self.R*(1/self.T - 1/self.T0)
             term5 = -self.dHr
             term6 = self.dCp[0] * self.T0
             term7 = self.dCp[1] / 2 * self.T0**2
             term8 = self.dCp[2] / 3 * self.T0**3
             term9 = self.dCp[3] / 4 * self.T0**4
-            arg5 = rtdiff * (term5 + term6 + term7 + term8 + term9)
-            logratio = arg1 + arg2 + arg3 + arg4 + arg5
+            bigterm2 = rtdiff * (term5 + term6 + term7 + term8 + term9)
+            logratio = bigterm1 + bigterm2
             self.KaT = self.Ka0 * np.exp(logratio)
+            self.KaT_simplified = self.Ka0 * np.exp(rtdiff * term5)
             self.Xeq = np.zeros(self.M)
+            # store intermediate van't Hoff terms for reporting later if needed
+            self.vantHoff_terms = {}
+            for t in ['arg1','arg2','arg3','arg4',
+                      'rtdiff','term5','term6','term7','term8','term9', 'logratio', 'bigterm1', 'bigterm2']:
+                self.vantHoff_terms[t] = eval(t)
 
-    def solve_implicit(self, Xinit=[], ideal=True):
+    def solve_implicit(self, Xinit=[], ideal=True, simplified=True):
         """
         Implicit solution of M equations using equilibrium constants. Solutions
         are stored in attributes **Xeq**, **N**, and **ys**.
@@ -99,6 +105,8 @@ class ChemEqSystem:
             Initial guess for extent of reaction (default is [])
         ideal : bool, optional
             Whether to assume ideal behavior (default is True)
+        simplified : bool, optional
+            Whether to use simplified van't Hoff equation (default is True)
         """
         if self.M == 0:
             raise ValueError('No reactions specified for implicit solution.')
@@ -126,12 +134,13 @@ class ChemEqSystem:
             """
             y = _YX(X)
             phi = np.ones(self.C)
+            KaT = self.KaT_simplified if simplified else self.KaT
             if not ideal:
                 pass
                 # to do -- fugacity coefficient calculation
             Ka_app = [np.prod(y**nu_j)*np.prod(phi**nu_j)*(self.P/self.Pstdst)**sum(nu_j) for nu_j in self.nu]
             # print(y,Ka_app)
-            return np.array([(kk-ka)/(kk+ka) for kk,ka in zip(Ka_app,self.KaT)])
+            return np.array([(kk-ka)/(kk+ka) for kk,ka in zip(Ka_app, KaT)])
         self.Xeq = fsolve(f_func, Xinit)
         self.N = _NX(self.Xeq)
         self.ys = _YX(self.Xeq)
@@ -150,12 +159,12 @@ class ChemEqSystem:
             Initial guess for mole numbers and Lagrange multipliers (default is [])
         """
         atomset = set()
-        for c in self.Components:
+        for c in self.components:
             atomset.update(c.atomset)
         self.atomlist = list(atomset)
         self.E = len(self.atomlist)
         self.A = np.zeros(self.E)
-        for i, c in enumerate(self.Components):
+        for i, c in enumerate(self.components):
             # compute total moles N by summing over mole numbers; 
             for k in range(self.E):
                 # compute constant number of atom-moles, A[]
@@ -170,13 +179,13 @@ class ChemEqSystem:
             phi = np.ones(self.C)
             for i in range(self.C):
                 # Computed Gibbs energy for each molecular species...
-                dGfoT = self.Components[i].dGf_T
+                dGfoT = self.components[i].dGf_T
                 F[i] = dGfoT/self.RT + np.log(z[i]/N * phi[i] * self.P/self.Pstdst)
                 for k in range(self.E):
                     # sum up Lagrange multiplier terms from each atom-balance
-                    F[i] += z[self.C+k]/self.RT * self.Components[i].countAtoms(self.atomlist[k])
+                    F[i] += z[self.C+k]/self.RT * self.components[i].countAtoms(self.atomlist[k])
                     # sum up each atom balance
-                    F[k+self.C] += z[i] * self.Components[i].countAtoms(self.atomlist[k])
+                    F[k+self.C] += z[i] * self.components[i].countAtoms(self.atomlist[k])
             for k in range(self.E):
                 # close each atom balance
                 F[k+self.C] -= self.A[k]
@@ -188,122 +197,23 @@ class ChemEqSystem:
         self.N = z[:self.C]
         self.ys = self.N / sum(self.N)
 
-    def texgen_kacalculations(self, simplified=True, sig=5) -> str:
-        """ 
-        Generates LaTeX string for equilibrium constant calculations.
-        
-        Parameters
-        ----------
-        simplified : bool, optional
-            whether to use simplified van't Hoff equation (default is True)
-        sig : int, optional
-            number of significant figures for formatting (default is 5)
-            
-        Returns
-        -------
-        str
-            LaTeX formatted string of equilibrium constant calculations
-        """
-        ka_calcslines = []
-        for i in range(self.M):
-            rxn_super = ''
-            if self.M > 1:
-                ka_calcslines.append(rf'\underline{{Reaction {roman.toRoman(i+1)}}}\\')
-                rxn_super = f'^{{{roman.toRoman(i+1)}}}'
-            ka_calcslines.append(r'\begin{align*}')
-            ka_calcslines.append(r'K_a'+rxn_super+r'(T_0) & = \exp\left[\frac{-\gr'+rxn_super+r'}{RT_0}\right] ')
-            ka_calcslines.append(r' = \exp\left[\frac{' + f'-({self.dGr[i]:.0f})' + r'}{' + f'({self.R})({self.T0})' + r'}\right]')
-            ka_calcslines.append(r' = ' + f'{format_sig(self.Ka0[i],sig)}' + r'\\')
-            if simplified:
-                ka_calcslines.append(r'K_a'+rxn_super+r'(T) & = K_a'+rxn_super+r'(T_0) \exp\left[\frac{-\hr'+rxn_super+r'}{R}\left(\frac{1}{T} - \frac{1}{T_0}\right)\right]\\')
-                ka_calcslines.append((r'& = ' + f'({format_sig(self.Ka0[i],sig)})' + r'\exp\left[\frac{' + f'-({self.dHr[i]:.0f})' + r'}{'
-                                    f'({self.R})' + r'}\left(\frac{1}{' + f'{self.T}' + r'} - \frac{1}{' + f'{self.T0}' + r'}\right)\right]\\'))
-            ka_calcslines.append(r'& = ' + f'{format_sig(self.KaT[i],sig)}')
-            ka_calcslines.append(r'\end{align*}')
-        return '\n'.join(ka_calcslines)
-
-    def report(self) -> str:
-        """
-        Generates a textual report of the chemical equilibrium system.
-        
-        Returns
-        -------
-        str
-            Textual report of reactions and mole fractions at equilibrium
-        """
-        result = ''
-        if len(self.Reactions)>0:
-            for i,(r,k,x) in enumerate(zip(self.Reactions,self.KaT,self.Xeq)):
-                result += f'Reaction {roman.toRoman(i+1):>4s}:  '
-                result += str(r)
-                result += f'  |  Ka({self.T:.2f} K)={k:.5e} => Xeq={x:.5e}' 
-                result += '\n'
-        for i,(c,N,y) in enumerate(zip(self.Components,self.N,self.ys)):
-            result += f'N_{{{str(c)}}}={N:.4f} y_{{{str(c)}}}={y:.4f}' 
+def report(self) -> str:
+    """
+    Generates a textual report of the chemical equilibrium system.
+    
+    Returns
+    -------
+    str
+        Textual report of reactions and mole fractions at equilibrium
+    """
+    result = ''
+    if len(self.reactions)>0:
+        for i,(r,k,x) in enumerate(zip(self.reactions,self.KaT,self.Xeq)):
+            result += f'Reaction {roman.toRoman(i+1):>4s}:  '
+            result += str(r)
+            result += f'  |  Ka({self.T:.2f} K)={k:.5e} => Xeq={x:.5e}' 
             result += '\n'
-        return result
-    
-    def stoichiometrictable_as_tex(self, float_format='{:.3f}'):
-        """
-        Generates LaTeX formatted stoichiometric table.
-        
-        Parameters
-        ----------
-        float_format : str, optional
-            format string for floating point numbers (default is '{:.3f}')
-        
-        Returns
-        -------
-        str
-            LaTeX formatted stoichiometric table
-        """
-        total_row = ['Totals:']
-        col1 = [c.as_tex() for c in self.compounds]
-        fstr = float_format
-        col2 = [r'\('+fstr.format(n)+r'\)' for n in self.N0] 
-        total_row += [r'\('+fstr.format(self.N0.sum())+r'\)']
-        tabledict = {'Species': col1, r'$N_{0,i}$': col2}
-        tabledict[f'$N_{{i}}$'] = []
-        Nus = [self.nu[j].sum() for j in range(self.M)]
-        Nis = []
-        for i,c in enumerate(self.compounds):
-            Ni = fstr.format(self.N0[i])
-            for j,r in enumerate(self.Reactions):
-                nu_sign = [' + ' if self.nu[j][i]>=0 else ' - ' for i in range(self.C)]
-                Xj = f'X_{{{roman.toRoman(j+1)}}}' if self.M>1 else 'X'
-                Ni += f'{nu_sign[i]}\\left({np.fabs(self.nu[j][i]):.2f}\\right){Xj}'
-            Nis.append(Ni)
-            tabledict[f'$N_{{i}}$'].append(r'\('+Ni+r'\)')
-        Ni_total = fstr.format(self.N0.sum())
-        for j in range(self.M):
-            nu_sign = ' + ' if Nus[j]>=0 else ' - '
-            Xj = f'X_{{{roman.toRoman(j+1)}}}' if self.M>1 else 'X'
-            Ni_total += f'{nu_sign}\\left({np.fabs(Nus[j]):.2f}\\right){Xj}'
-        total_row += [r'\('+Ni_total+r'\)']
-        tabledict[f'$y_{{i}} = N_{{i}} / \\sum_{{i}} N_{{i}}$'] = []
-        for i in range(self.C):
-            yi = r'\left[' + Nis[i] + r'\right] / \left[' + Ni_total + r'\right]'
-            tabledict[f'$y_{{i}} = N_{{i}} / \\sum_{{i}} N_{{i}}$'].append(r'\('+yi+r'\)')
-        total_row += [r'\(1.0\)']
-        return table_as_tex(tabledict, float_format=float_format, total_row=total_row, index=False)
-    
-    def thermochemicaltable_as_tex(self, float_format=r'\({:,.0f}\)'):
-        """
-        Generates LaTeX formatted thermochemical data table.
-        
-        Parameters
-        ----------
-        float_format : str, optional
-            format string for floating point numbers (default is {:,.0f}')
-        
-        Returns
-        -------
-        str
-            LaTeX formatted thermochemical data table
-        """
-        return table_as_tex({
-            'Species':[c.as_tex() for c in self.compounds],
-            r'$\hf$ (J/mol)':[c.thermoChemicalData['H'] for c in self.compounds],
-            r'$\gf$ (J/mol)':[c.thermoChemicalData['G'] for c in self.compounds]},
-            drop_zeros=[False,True,True], float_format=float_format.format)
-    
+    for i,(c,N,y) in enumerate(zip(self.components,self.N,self.ys)):
+        result += f'N_{{{str(c)}}}={N:.4f} y_{{{str(c)}}}={y:.4f}' 
+        result += '\n'
+    return result
