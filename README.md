@@ -171,6 +171,8 @@ N_{NH3}=1.6828 y_{NH3}=0.7262
 
 ## Release History
 
+* 0.2.1
+    * included `roman` dependency
 * 0.2.0
     * Full van't Hoff option available via `abbreviated=False` argument to `ChemEqSystem`
 * 0.1.0
