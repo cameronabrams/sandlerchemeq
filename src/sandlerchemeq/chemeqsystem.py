@@ -11,7 +11,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from scipy.optimize import fsolve
 
-from sandlermisc.gas_constant import GasConstant
+from sandlermisc import R, ureg
 from sandlerprops.properties import get_database
 
 from .reaction import Reaction
@@ -46,7 +46,7 @@ class ChemEqSystem:
 
     def __post_init__(self):
         self.C = len(self.components)
-        self.R = GasConstant() # J/mol.K
+        self.R = R # J/mol.K
         self.RT = self.R * self.T
         self.M = len(self.reactions)
         for c in self.components:
