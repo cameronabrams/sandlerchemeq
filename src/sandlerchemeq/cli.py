@@ -49,7 +49,7 @@ def solve(args):
             reaction_components.append(c)
         rxn = Reaction(components=reaction_components)
         reactions.append(rxn)
-    system = ChemEqSystem(Components=components, Reactions=reactions,
+    system = ChemEqSystem(components=components, reactions=reactions,
                           N0=args.initial_moles,
                           T=args.temperature,
                           P=args.pressure)

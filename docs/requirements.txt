@@ -1,0 +1,14 @@
+# Documentation build requirements
+sphinx>=5.0
+sphinx-copybutton>=0.5
+sphinxcontrib-mermaid>=0.7
+furo
+
+# Package dependencies (needed for autodoc)
+numpy>=1.20
+scipy>=1.7
+pint
+roman
+sandlermisc
+sandlerprops
+sandlerchemeq
