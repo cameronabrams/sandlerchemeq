@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-06
+
 ### Fixed
 
 - `ChemEqSystem.solve_lagrange`: `fsolve` call was inside the `if len(zGuess) == 0` branch, causing a `NameError` when a non-empty `zInit` was supplied.
