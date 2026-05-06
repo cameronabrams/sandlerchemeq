@@ -1,6 +1,7 @@
 from unittest import TestCase
 from sandlerchemeq.component import Component
 from sandlerprops.properties import PropertiesDatabase, get_database
+from numpy.testing import assert_allclose
 
 class TestComponent(TestCase):
 
@@ -24,12 +25,12 @@ class TestComponent(TestCase):
         self.assertEqual(comp.Name, compound.Name)
         self.assertEqual(comp.Formula, compound.Formula)
         self.assertEqual(comp.Molwt, compound.Molwt)
-        self.assertEqual(comp.T, 350)
-        self.assertEqual(comp.P, 5)
+        self.assertEqual(comp.T.m_as('K'), 350)
+        self.assertEqual(comp.P.m_as('bar'), 5)
         self.assertEqual(comp.dHf, compound.dHf)
         self.assertEqual(comp.countAtoms('C'), 2)
 
-        self.assertEqual(comp.dGf_T, -157108.75161900392)
+        assert_allclose(comp.dGf_T.m_as('J/mol'), -157108.75161900392)
 
     def test_component_no_compound(self):
         comp = Component(Name='unobtainium', Formula='X3Y4')

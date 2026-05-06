@@ -5,6 +5,15 @@ All notable changes to sandlerchemeq will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `ChemEqSystem.solve_lagrange`: `fsolve` call was inside the `if len(zGuess) == 0` branch, causing a `NameError` when a non-empty `zInit` was supplied.
+- `ChemEqSystem.solve_implicit`: `Xinit` default changed from `[]` to `None`; a `None` value (as passed by the CLI when `--X-init` is omitted) is now treated as zeros, preventing a crash.
+- CLI `--pressure` help text corrected from "MPa" to "bar" to match the unit assumed by the code.
+- `test_component_inheritance_from_compound`: updated `T`, `P`, and `dGf_T` assertions to use pint-aware comparisons (`.m_as()`).
+
 ## [0.3.0] - 2026-02-21
 
 ### Added

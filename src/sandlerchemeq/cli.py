@@ -157,7 +157,7 @@ def cli():
         '--pressure',
         type=float,
         required=True,
-        help='Pressure in MPa'
+        help='Pressure in bar'
     )
 
     command_parsers['solve'].add_argument(

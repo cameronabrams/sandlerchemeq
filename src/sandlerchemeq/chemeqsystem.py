@@ -107,7 +107,7 @@ class ChemEqSystem:
                       'rtdiff','term5','term6','term7','term8','term9', 'logratio', 'bigterm1', 'bigterm2']:
                 self.vantHoff_terms[t] = eval(t)
 
-    def solve_implicit(self, Xinit=[], ideal=True, simplified=False):
+    def solve_implicit(self, Xinit=None, ideal=True, simplified=False):
         """
         Implicit solution of M equations using equilibrium constants. Solutions
         are stored in attributes **Xeq**, **N**, and **ys**.
@@ -115,7 +115,7 @@ class ChemEqSystem:
         Parameters
         ----------
         Xinit : list, optional
-            Initial guess for extent of reaction (default is [])
+            Initial guess for extent of reaction (default is zeros)
         ideal : bool, optional
             Whether to assume ideal behavior (default is True)
         simplified : bool, optional
@@ -126,6 +126,8 @@ class ChemEqSystem:
         """
         if self.M == 0:
             raise ValueError('No reactions specified for implicit solution.')
+        if Xinit is None:
+            Xinit = np.zeros(self.M)
         P_ratio = (self.P / self.Pstdst).m_as('')   # dimensionless plain float
         def _NX(X):
             """ Numbers of moles from extent of reaction """
@@ -203,7 +205,7 @@ class ChemEqSystem:
         zGuess = zInit
         if len(zGuess) == 0:
             zGuess = np.array([0.1]*self.C + [1000.]*self.E)
-            z = fsolve(f_func, zGuess)
+        z = fsolve(f_func, zGuess)
         self.N = z[:self.C]
         self.ys = self.N / sum(self.N)
 
