@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Version bumped to 0.3.2; 0.3.1 was already published to PyPI under a prior tag and could not be reused.
+
 ## [0.3.1] - 2026-05-06
 
 ### Fixed
