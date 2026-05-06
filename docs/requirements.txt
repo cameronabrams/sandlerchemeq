@@ -1,5 +1,6 @@
 # Documentation build requirements
 sphinx>=5.0
+myst-parser
 sphinx-copybutton>=0.5
 sphinxcontrib-mermaid>=0.7
 furo

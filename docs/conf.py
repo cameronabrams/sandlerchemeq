@@ -18,6 +18,7 @@ version = '.'.join(release.split('.')[:2])
 # -- General configuration ---------------------------------------------------
 
 extensions = [
+    'myst_parser',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.duration',
